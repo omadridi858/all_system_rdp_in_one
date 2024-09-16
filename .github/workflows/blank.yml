@@ -1,4 +1,5 @@
 name: CI
+
 on:
   workflow_dispatch:
     inputs:
@@ -75,7 +76,7 @@ jobs:
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-    - name: Enable RDP
+    - name: Enable RDP or VNC
       shell: pwsh
       run: |
         if ($env:RUNNER_OS -eq "Windows") {
@@ -91,12 +92,12 @@ jobs:
           sudo useradd -m -s /bin/bash runneradmin
           echo "runneradmin:P@ssw0rd!" | sudo chpasswd
         } elseif ($env:RUNNER_OS -eq "macOS") {
-          brew install xrdp
-          sudo xrdp --install
-          sudo /etc/init.d/xrdp start
-          sudo dscl . create /Users/runneradmin
-          sudo dscl . create /Users/runneradmin UserShell /bin/bash
-          sudo dscl . passwd /Users/runneradmin P@ssw0rd!
+          brew install --cask real-vnc
+          sudo launchctl load /Library/LaunchDaemons/com.realvnc.vncserver.plist
+          sudo defaults write /Library/Preferences/com.realvnc.vncserver.plist -dict-add "Authentication" -string "VNCPassword"
+          sudo defaults write /Library/Preferences/com.realvnc.vncserver.plist -dict-add "Password" -string "P@ssw0rd!"
+          sudo defaults write /Library/Preferences/com.realvnc.vncserver.plist -dict-add "Access" -string "1"
+          sudo defaults write /Library/Preferences/com.realvnc.vncserver.plist -dict-add "Security" -string "1"
         }
     - name: Print Connection Details
       if: runner.os == 'Linux'
@@ -113,6 +114,8 @@ jobs:
       run: |
         if ($env:RUNNER_OS -eq "Windows") {
           .\ngrok\ngrok.exe tcp 3389
-        } else {
+        } elseif ($env:RUNNER_OS -eq "Linux") {
           ./ngrok/ngrok tcp 3389
+        } elseif ($env:RUNNER_OS -eq "macOS") {
+          ./ngrok/ngrok tcp 5900
         }
