@@ -82,7 +82,7 @@ jobs:
           sudo apt update
           sudo apt install -y xrdp
           sudo systemctl enable xrdp
-          sudo ufw allow 3389/tcp
+          sudo ufw allow ssh
           sudo useradd -m -s /bin/bash runneradmin
           echo "runneradmin:P@ssw0rd!" | sudo chpasswd
         } elseif ($env:RUNNER_OS -eq "macOS") {
