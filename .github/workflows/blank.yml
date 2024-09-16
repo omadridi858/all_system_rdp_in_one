@@ -84,10 +84,7 @@ jobs:
           sudo systemctl enable xrdp
           sudo ufw allow 3389/tcp
           sudo useradd -m -s /bin/bash runneradmin
-          sudo passwd runneradmin <<EOF
-          P@ssw0rd!
-          P@ssw0rd!
-          EOF
+          echo "P@ssw0rd!" | sudo passwd --stdin runneradmin
         } elseif ($env:RUNNER_OS -eq "macOS") {
           brew install xrdp
           sudo xrdp --install
