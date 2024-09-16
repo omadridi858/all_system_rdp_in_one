@@ -1,0 +1,113 @@
+name: CI
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest, freebsd-latest, raspberry-pi]
+        sdk: [go, nodejs, rust, python, java, ruby, dotnet]
+        infra: [docker, kubernetes]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    # Check for OS and download Ngrok accordingly
+    - name: Download Ngrok for Windows
+      if: matrix.os == 'windows-latest'
+      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+
+    - name: Download Ngrok for Linux
+      if: matrix.os == 'ubuntu-latest' || matrix.os == 'freebsd-latest' || matrix.os == 'raspberry-pi'
+      run: curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
+
+    - name: Download Ngrok for MacOS
+      if: matrix.os == 'macos-latest'
+      run: curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip
+
+    # Extract Ngrok based on OS
+    - name: Extract Ngrok (Windows)
+      if: matrix.os == 'windows-latest'
+      run: Expand-Archive ngrok.zip -DestinationPath ngrok
+
+    - name: Extract Ngrok (Unix-like)
+      if: matrix.os != 'windows-latest'
+      run: unzip ngrok.zip -d ngrok
+
+    # Authenticate Ngrok with token for all systems
+    - name: Authenticate Ngrok
+      run: |
+        if [ ${{ matrix.os }} == "windows-latest" ]; then
+          .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+        else
+          ./ngrok/ngrok authtoken $NGROK_AUTH_TOKEN
+        fi
+      env:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    # Enable RDP for different OSes
+    - name: Enable RDP (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
+
+    - name: Enable RDP (Linux-based systems)
+      if: matrix.os == 'ubuntu-latest' || matrix.os == 'freebsd-latest' || matrix.os == 'raspberry-pi'
+      run: |
+        sudo apt update
+        sudo apt install -y xrdp
+        sudo systemctl enable xrdp
+        sudo ufw allow 3389/tcp
+
+    # Enable RDP for MacOS
+    - name: Enable RDP (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install xrdp
+        sudo xrdp --install
+        sudo /etc/init.d/xrdp start
+
+    # Create Ngrok Tunnel for RDP on all systems
+    - name: Create Ngrok Tunnel
+      run: |
+        if [ ${{ matrix.os }} == "windows-latest" ]; then
+          .\ngrok\ngrok.exe tcp 3389
+        else
+          ./ngrok/ngrok tcp 3389
+
+    # SDK installation step for development environments
+    - name: Setup SDKs
+      run: |
+        if [ ${{ matrix.sdk }} == "go" ]; then
+          curl -OL https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
+          export PATH=$PATH:/usr/local/go/bin
+        elif [ ${{ matrix.sdk }} == "nodejs" ]; then
+          curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+          sudo apt install -y nodejs
+        elif [ ${{ matrix.sdk }} == "rust" ]; then
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+        elif [ ${{ matrix.sdk }} == "python" ]; then
+          sudo apt-get update && sudo apt-get install python3
+        elif [ ${{ matrix.sdk }} == "java" ]; then
+          sudo apt install default-jdk -y
+        elif [ ${{ matrix.sdk }} == "ruby" ]; then
+          sudo apt install ruby-full
+        elif [ ${{ matrix.sdk }} == "dotnet" ]; then
+          sudo apt-get install -y dotnet-sdk-5.0
+        fi
+
+    # Infrastructure setup for Docker or Kubernetes
+    - name: Setup Infrastructure
+      run: |
+        if [ ${{ matrix.infra }} == "docker" ]; then
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+        elif [ ${{ matrix.infra }} == "kubernetes" ]; then
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+        fi
