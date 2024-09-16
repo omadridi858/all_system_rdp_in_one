@@ -95,39 +95,9 @@ jobs:
         echo "Password: P@ssw0rd!"
         echo "IP: $(curl -s ifconfig.me)"
         echo "Port: 3389"
-        grep -o -E "tcp://(.+)" ngrok.log | sed "s/tcp:\/\//ssh runneradmin@/" | sed "s/:/ -p /"
+        echo "RDP Address:"
+        curl --silent --show-error http://$(curl -s ifconfig.me):3389/api/tunnels | sed -nE 's/.*public_url":"tcp:..([^"]*).*/\1/p'
 
-    - name: Setup SDKs
-      shell: pwsh
-      run: |
-        if ($env:SDK -eq "go") {
-          curl -OL https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
-          sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
-          export PATH=$PATH:/usr/local/go/bin
-        } elseif ($env:SDK -eq "nodejs") {
-          curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
-          sudo apt install -y nodejs
-        } elseif ($env:SDK -eq "rust") {
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-        } elseif ($env:SDK -eq "python") {
-          sudo apt-get update && sudo apt-get install python3
-        } elseif ($env:SDK -eq "java") {
-          sudo apt install default-jdk -y
-        } elseif ($env:SDK -eq "ruby") {
-          sudo apt install ruby-full
-        } elseif ($env:SDK -eq "dotnet") {
-          sudo apt-get install -y dotnet-sdk-5.0
-        }
-    - name: Setup Infrastructure
-      shell: pwsh
-      run: |
-        if ($env:INFRA -eq "docker") {
-          sudo apt-get update
-          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-        } elseif ($env:INFRA -eq "kubernetes") {
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-        }
 
     - name: Create Ngrok Tunnel
       shell: pwsh
@@ -137,3 +107,4 @@ jobs:
         } else {
           ./ngrok/ngrok tcp 3389
         }
+
