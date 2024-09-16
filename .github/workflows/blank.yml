@@ -38,32 +38,30 @@ jobs:
     runs-on: ${{ github.event.inputs.os }}
 
     steps:
-    # Check for OS and download Ngrok accordingly
-    - name: Download Ngrok for Windows
-      if: ${{ github.event.inputs.os == 'windows-latest' }}
-      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-    - name: Download Ngrok for Linux
-      if: ${{ github.event.inputs.os == 'ubuntu-latest' || github.event.inputs.os == 'freebsd-latest' || github.event.inputs.os == 'raspberry-pi' }}
-      run: curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
+    - name: Download Ngrok
+      run: |
+        if [ "${{ github.event.inputs.os }}" == "windows-latest" ]; then
+          Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+        elif [ "${{ github.event.inputs.os }}" == "ubuntu-latest" ] || [ "${{ github.event.inputs.os }}" == "freebsd-latest" ] || [ "${{ github.event.inputs.os }}" == "raspberry-pi" ]; then
+          curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
+        elif [ "${{ github.event.inputs.os }}" == "macos-latest" ]; then
+          curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip
+        fi
 
-    - name: Download Ngrok for MacOS
-      if: ${{ github.event.inputs.os == 'macos-latest' }}
-      run: curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip
+    - name: Extract Ngrok
+      run: |
+        if [ "${{ github.event.inputs.os }}" == "windows-latest" ]; then
+          Expand-Archive ngrok.zip -DestinationPath ngrok
+        else
+          unzip ngrok.zip -d ngrok
+        fi
 
-    # Extract Ngrok based on OS
-    - name: Extract Ngrok (Windows)
-      if: ${{ github.event.inputs.os == 'windows-latest' }}
-      run: Expand-Archive ngrok.zip -DestinationPath ngrok
-
-    - name: Extract Ngrok (Unix-like)
-      if: ${{ github.event.inputs.os != 'windows-latest' }}
-      run: unzip ngrok.zip -d ngrok
-
-    # Authenticate Ngrok with token for all systems
     - name: Authenticate Ngrok
       run: |
-        if [ ${{ github.event.inputs.os }} == "windows-latest" ]; then
+        if [ "${{ github.event.inputs.os }}" == "windows-latest" ]; then
           .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
         else
           ./ngrok/ngrok authtoken $NGROK_AUTH_TOKEN
@@ -71,69 +69,59 @@ jobs:
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-    # Enable RDP for different OSes
-    - name: Enable RDP (Windows)
-      if: ${{ github.event.inputs.os == 'windows-latest' }}
+    - name: Enable RDP
       run: |
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
-        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
+        if [ "${{ github.event.inputs.os }}" == "windows-latest" ]; then
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+          Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
+        elif [ "${{ github.event.inputs.os }}" == "ubuntu-latest" ] || [ "${{ github.event.inputs.os }}" == "freebsd-latest" ] || [ "${{ github.event.inputs.os }}" == "raspberry-pi" ]; then
+          sudo apt update
+          sudo apt install -y xrdp
+          sudo systemctl enable xrdp
+          sudo ufw allow 3389/tcp
+        elif [ "${{ github.event.inputs.os }}" == "macos-latest" ]; then
+          brew install xrdp
+          sudo xrdp --install
+          sudo /etc/init.d/xrdp start
+        fi
 
-    - name: Enable RDP (Linux-based systems)
-      if: ${{ github.event.inputs.os == 'ubuntu-latest' || github.event.inputs.os == 'freebsd-latest' || github.event.inputs.os == 'raspberry-pi' }}
-      run: |
-        sudo apt update
-        sudo apt install -y xrdp
-        sudo systemctl enable xrdp
-        sudo ufw allow 3389/tcp
-
-    # Enable RDP for MacOS
-    - name: Enable RDP (MacOS)
-      if: ${{ github.event.inputs.os == 'macos-latest' }}
-      run: |
-        brew install xrdp
-        sudo xrdp --install
-        sudo /etc/init.d/xrdp start
-
-    # Create Ngrok Tunnel for RDP on all systems
     - name: Create Ngrok Tunnel
       run: |
-        if [ ${{ github.event.inputs.os }} == "windows-latest" ]; then
+        if [ "${{ github.event.inputs.os }}" == "windows-latest" ]; then
           .\ngrok\ngrok.exe tcp 3389
         else
           ./ngrok/ngrok tcp 3389
         fi
 
-    # SDK installation step for development environments
     - name: Setup SDKs
       run: |
-        if [ ${{ github.event.inputs.sdk }} == "go" ]; then
+        if [ "${{ github.event.inputs.sdk }}" == "go" ]; then
           curl -OL https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
           sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
           export PATH=$PATH:/usr/local/go/bin
-        elif [ ${{ github.event.inputs.sdk }} == "nodejs" ]; then
+        elif [ "${{ github.event.inputs.sdk }}" == "nodejs" ]; then
           curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
           sudo apt install -y nodejs
-        elif [ ${{ github.event.inputs.sdk }} == "rust" ]; then
+        elif [ "${{ github.event.inputs.sdk }}" == "rust" ]; then
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-        elif [ ${{ github.event.inputs.sdk }} == "python" ]; then
+        elif [ "${{ github.event.inputs.sdk }}" == "python" ]; then
           sudo apt-get update && sudo apt-get install python3
-        elif [ ${{ github.event.inputs.sdk }} == "java" ]; then
+        elif [ "${{ github.event.inputs.sdk }}" == "java" ]; then
           sudo apt install default-jdk -y
-        elif [ ${{ github.event.inputs.sdk }} == "ruby" ]; then
+        elif [ "${{ github.event.inputs.sdk }}" == "ruby" ]; then
           sudo apt install ruby-full
-        elif [ ${{ github.event.inputs.sdk }} == "dotnet" ]; then
+        elif [ "${{ github.event.inputs.sdk }}" == "dotnet" ]; then
           sudo apt-get install -y dotnet-sdk-5.0
         fi
 
-    # Infrastructure setup for Docker or Kubernetes
     - name: Setup Infrastructure
       run: |
-        if [ ${{ github.event.inputs.infra }} == "docker" ]; then
+        if [ "${{ github.event.inputs.infra }}" == "docker" ]; then
           sudo apt-get update
           sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-        elif [ ${{ github.event.inputs.infra }} == "kubernetes" ]; then
+        elif [ "${{ github.event.inputs.infra }}" == "kubernetes" ]; then
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
         fi
