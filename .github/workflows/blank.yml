@@ -1,5 +1,4 @@
 name: CI
-
 on:
   workflow_dispatch:
     inputs:
@@ -46,7 +45,7 @@ jobs:
       run: |
         if ($env:RUNNER_OS -eq "Windows") {
           Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
-        } elseif ($env:RUNNER_OS -eq "Linux" -or $env:RUNNER_OS -eq "macOS") {
+        } elseif ($env:RUNNER_OS -eq "Linux") {
           curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
         } elseif ($env:RUNNER_OS -eq "macOS") {
           curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip
@@ -59,12 +58,18 @@ jobs:
         } else {
           unzip ngrok.zip -d ngrok
         }
+    - name: Make Ngrok Executable
+      shell: pwsh
+      run: |
+        if ($env:RUNNER_OS -eq "macOS") {
+          chmod +x ./ngrok/ngrok
+        }
     - name: Authenticate Ngrok
       shell: pwsh
       run: |
         if ($env:RUNNER_OS -eq "Windows") {
           .\ngrok\ngrok.exe authtoken $env:NGROK_AUTH_TOKEN
-        } else {
+        } elseif ($env:RUNNER_OS -eq "Linux" -or $env:RUNNER_OS -eq "macOS") {
           ./ngrok/ngrok authtoken $env:NGROK_AUTH_TOKEN
         }
       env:
@@ -103,8 +108,6 @@ jobs:
         echo "Port: 3389"
         echo "RDP Address:"
         curl --silent --show-error http://127.0.0.1:3389/api/tunnels | sed -nE 's/.*public_url":"tcp:..([^"]*).*/\1/p'
-
-
     - name: Create Ngrok Tunnel
       shell: pwsh
       run: |
@@ -113,4 +116,3 @@ jobs:
         } else {
           ./ngrok/ngrok tcp 3389
         }
-
