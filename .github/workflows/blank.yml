@@ -103,6 +103,7 @@ jobs:
           .\ngrok\ngrok.exe tcp 3389
         else
           ./ngrok/ngrok tcp 3389
+        fi
 
     # SDK installation step for development environments
     - name: Setup SDKs
