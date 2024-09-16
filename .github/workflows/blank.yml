@@ -91,7 +91,7 @@ jobs:
     - name: Print Connection Details
       if: runner.os == 'Linux'
       run: |
-        echo whomi 
+        whomi 
         echo "User: runneradmin"
         echo "Password: P@ssw0rd!"
         echo "IP: $(curl -s ifconfig.me)"
