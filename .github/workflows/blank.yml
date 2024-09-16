@@ -32,6 +32,28 @@ on:
         options:
           - docker
           - kubernetes
+      authcode:
+        description: 'Visit https://remotedesktop.google.com/headless & paste the authorization code'
+        required: true
+      pincode:
+        description: 'Enter a pin code'
+        default: '123456'
+        required: true
+      authtoken:
+        description: 'NGROK_AUTH_TOKEN'
+        required: true
+      computername:
+        description: 'MACHINE_NAME'
+        default: 'ubuntu'
+        required: true
+      username:
+        description: 'USER_NAME'
+        default: 'user'
+        required: true
+      password:
+        description: 'USER_PASSWORD'
+        default: 'root'
+        required: true
 
 jobs:
   build:
@@ -41,96 +63,78 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Download Ngrok
-      shell: pwsh
+    - name: Mask Secrets
       run: |
-        if ($env:RUNNER_OS -eq "Windows") {
-          Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
-        } elseif ($env:RUNNER_OS -eq "Linux" -or $env:RUNNER_OS -eq "macOS") {
-          curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
-        } elseif ($env:RUNNER_OS -eq "macOS") {
-          curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip
-        }
-    - name: Extract Ngrok
-      shell: pwsh
-      run: |
-        if ($env:RUNNER_OS -eq "Windows") {
-          Expand-Archive ngrok.zip -DestinationPath ngrok
-        } else {
-          unzip ngrok.zip -d ngrok
-        }
-    - name: Authenticate Ngrok
-      shell: pwsh
-      run: |
-        if ($env:RUNNER_OS -eq "Windows") {
-          .\ngrok\ngrok.exe authtoken $env:NGROK_AUTH_TOKEN
-        } else {
-          ./ngrok/ngrok authtoken $env:NGROK_AUTH_TOKEN
-        }
-      env:
-        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        echo NGROK_AUTH_TOKEN=${{ github.event.inputs.authtoken }} >> $GITHUB_ENV
+        echo COMPUTER_NAME=${{ github.event.inputs.computername }} >> $GITHUB_ENV
+        echo USERNAME=${{ github.event.inputs.username }} >> $GITHUB_ENV
+        echo PASSWORD=${{ github.event.inputs.password }} >> $GITHUB_ENV
 
-    - name: Enable RDP
-      shell: pwsh
+    - name: Setup Environment
       run: |
-        if ($env:RUNNER_OS -eq "Windows") {
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
-          Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
-        } elseif ($env:RUNNER_OS -eq "Linux") {
-          sudo apt update
-          sudo apt install -y xrdp
-          sudo systemctl enable xrdp
-          sudo ufw allow 3389/tcp
-        } elseif ($env:RUNNER_OS -eq "macOS") {
-          brew install xrdp
-          sudo xrdp --install
-          sudo /etc/init.d/xrdp start
-        }
-    - name: Print Details
+        sudo apt-get update
+        sudo apt-get upgrade -y
+
+    - name: Install Desktop Environment and Services
+      if: runner.os == 'Linux'
       run: |
-        echo "User: runneradmin"
-        echo "Password: P@ssw0rd!"
+        sudo apt-get install -y xfce4 xfce4-goodies xrdp
+        sudo systemctl enable xrdp
+        sudo ufw allow 3389/tcp
+        sudo adduser $USERNAME
+        echo "$USERNAME:$PASSWORD" | sudo chpasswd
+        sudo usermod -aG sudo $USERNAME
+        echo "exec xfce4-session" | sudo tee /etc/xrdp/startwm.sh
+
+    - name: Install Ngrok
+      if: runner.os == 'Linux'
+      run: |
+        curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
+        unzip ngrok.zip
+        chmod +x ngrok
+        ./ngrok authtoken ${{ github.event.inputs.authtoken }}
+
+    - name: Start Ngrok Tunnel
+      if: runner.os == 'Linux'
+      run: |
+        ./ngrok tcp 3389 --log "ngrok.log" &
+        sleep 10
+
+    - name: Print Connection Details
+      if: runner.os == 'Linux'
+      run: |
+        echo "User: ${{ github.event.inputs.username }}"
+        echo "Password: ${{ github.event.inputs.password }}"
         echo "IP: $(curl -s ifconfig.me)"
         echo "Port: 3389"
-    - name: Create Ngrok Tunnel
-      shell: pwsh
-      run: |
-        if ($env:RUNNER_OS -eq "Windows") {
-          .\ngrok\ngrok.exe tcp 3389
-        } else {
-          ./ngrok/ngrok tcp 3389
-        }
+        grep -o -E "tcp://(.+)" ngrok.log | sed "s/tcp:\/\//ssh ${{ github.event.inputs.username }}@/" | sed "s/:/ -p /"
+
     - name: Setup SDKs
-      shell: pwsh
       run: |
-        if ($env:SDK -eq "go") {
+        if ( "${{ github.event.inputs.sdk }}" == "go" ){
           curl -OL https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
           sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
-          export PATH=$PATH:/usr/local/go/bin
-        } elseif ($env:SDK -eq "nodejs") {
-          curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
-          sudo apt install -y nodejs
-        } elseif ($env:SDK -eq "rust") {
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-        } elseif ($env:SDK -eq "python") {
-          sudo apt-get update && sudo apt-get install python3
-        } elseif ($env:SDK -eq "java") {
-          sudo apt install default-jdk -y
-        } elseif ($env:SDK -eq "ruby") {
-          sudo apt install ruby-full
-        } elseif ($env:SDK -eq "dotnet") {
+          export PATH=$PATH:/usr/local/go/bin}
+        elif ( "${{ github.event.inputs.sdk }}" == "nodejs" ){
+          curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - 
+          sudo apt install -y nodejs}
+        elif ( "${{ github.event.inputs.sdk }}" == "rust" ){
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh}
+        elif ( "${{ github.event.inputs.sdk }}" == "python" ){
+          sudo apt-get install -y python3}
+        elif ( "${{ github.event.inputs.sdk }}" == "java" ){
+          sudo apt install -y default-jdk}
+        elif ( "${{ github.event.inputs.sdk }}" == "ruby" ){
+          sudo apt install -y ruby-full}
+        elif ( "${{ github.event.inputs.sdk }}" == "dotnet" ){
           sudo apt-get install -y dotnet-sdk-5.0
         }
+
     - name: Setup Infrastructure
-      shell: pwsh
       run: |
-        if ($env:INFRA -eq "docker") {
-          sudo apt-get update
+        if ( "${{ github.event.inputs.infra }}" == "docker" ){
           sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-        } elseif ($env:INFRA -eq "kubernetes") {
+        } elif ( "${{ github.event.inputs.infra }}" == "kubernetes" ){
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
         }
-
