@@ -96,7 +96,7 @@ jobs:
         echo "IP: $(curl -s ifconfig.me)"
         echo "Port: 3389"
         echo "RDP Address:"
-        curl --silent --show-error http://$(curl -s ifconfig.me):3389/api/tunnels | sed -nE 's/.*public_url":"tcp:..([^"]*).*/\1/p'
+        curl --silent --show-error http://127.0.0.1:3389/api/tunnels | sed -nE 's/.*public_url":"tcp:..([^"]*).*/\1/p'
 
 
     - name: Create Ngrok Tunnel
