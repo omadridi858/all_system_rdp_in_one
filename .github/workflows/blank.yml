@@ -88,16 +88,15 @@ jobs:
           sudo xrdp --install
           sudo /etc/init.d/xrdp start
         }
-        echo "RDP Address:"
-        curl --silent --show-error http://127.0.0.1:4040/api/tunnels | sed -nE 's/.*public_url":"tcp:..([^"]*).*/\1/p'
-    - name: Create Ngrok Tunnel
-      shell: pwsh
+    - name: Print Connection Details
+      if: runner.os == 'Linux'
       run: |
-        if ($env:RUNNER_OS -eq "Windows") {
-          .\ngrok\ngrok.exe tcp 3389
-        } else {
-          ./ngrok/ngrok tcp 3389
-        }
+        echo "User: runneradmin"
+        echo "Password: P@ssw0rd!"
+        echo "IP: $(curl -s ifconfig.me)"
+        echo "Port: 3389"
+        grep -o -E "tcp://(.+)" ngrok.log | sed "s/tcp:\/\//ssh runneradmin@/" | sed "s/:/ -p /"
+
     - name: Setup SDKs
       shell: pwsh
       run: |
@@ -128,4 +127,13 @@ jobs:
         } elseif ($env:INFRA -eq "kubernetes") {
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+        }
+
+    - name: Create Ngrok Tunnel
+      shell: pwsh
+      run: |
+        if ($env:RUNNER_OS -eq "Windows") {
+          .\ngrok\ngrok.exe tcp 3389
+        } else {
+          ./ngrok/ngrok tcp 3389
         }
