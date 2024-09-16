@@ -43,11 +43,11 @@ jobs:
 
     - name: Download Ngrok
       run: |
-        if [ "${{ github.event.inputs.os }}" == "windows-latest" ]; then
+        if ( "${{ github.event.inputs.os }}" == "windows-latest" ); then
           Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
-        elif [ "${{ github.event.inputs.os }}" == "ubuntu-latest" ] || [ "${{ github.event.inputs.os }}" == "freebsd-latest" ] || [ "${{ github.event.inputs.os }}" == "raspberry-pi" ]; then
+        elif ( "${{ github.event.inputs.os }}" == "ubuntu-latest" ) || [ "${{ github.event.inputs.os }}" == "freebsd-latest" ] || [ "${{ github.event.inputs.os }}" == "raspberry-pi" ]; then
           curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
-        elif [ "${{ github.event.inputs.os }}" == "macos-latest" ]; then
+        elif ( "${{ github.event.inputs.os }}" == "macos-latest" ); then
           curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip
         fi
 
