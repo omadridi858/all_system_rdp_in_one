@@ -65,7 +65,7 @@ jobs:
         if ($env:RUNNER_OS -eq "Windows") {
           .\ngrok\ngrok.exe authtoken $env:NGROK_AUTH_TOKEN
         } else {
-          /Users/runner/work/all_system_rdp_in_one/all_system_rdp_in_one/ngrok/ngrok authtoken $env:NGROK_AUTH_TOKEN
+          ./ngrok/ngrok authtoken $env:NGROK_AUTH_TOKEN
         }
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
