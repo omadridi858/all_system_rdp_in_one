@@ -110,25 +110,32 @@ jobs:
         grep -o -E "tcp://(.+)" ngrok.log | sed "s/tcp:\/\//ssh ${{ github.event.inputs.username }}@/" | sed "s/:/ -p /"
 
     - name: Setup SDKs
+      env:
+        NGROK_AUTH_TOKEN: ${{ github.event.inputs.authtoken }}
+        COMPUTER_NAME: ${{ github.event.inputs.computername }}
+        USERNAME: ${{ github.event.inputs.username }}
+        PASSWORD: ${{ github.event.inputs.password }}
       run: |
-        if ( "${{ github.event.inputs.sdk }}" == "go" ){
+        if [ "${{ github.event.inputs.sdk }}" == "go" ]; then
           curl -OL https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
           sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
-          export PATH=$PATH:/usr/local/go/bin}
-        elif ( "${{ github.event.inputs.sdk }}" == "nodejs" ){
-          curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - 
-          sudo apt install -y nodejs}
-        elif ( "${{ github.event.inputs.sdk }}" == "rust" ){
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh}
-        elif ( "${{ github.event.inputs.sdk }}" == "python" ){
-          sudo apt-get install -y python3}
-        elif ( "${{ github.event.inputs.sdk }}" == "java" ){
-          sudo apt install -y default-jdk}
-        elif ( "${{ github.event.inputs.sdk }}" == "ruby" ){
-          sudo apt install -y ruby-full}
-        elif ( "${{ github.event.inputs.sdk }}" == "dotnet" ){
+          export PATH=$PATH:/usr/local/go/bin
+        elif [ "${{ github.event.inputs.sdk }}" == "nodejs" ]; then
+          curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+          sudo apt install -y nodejs
+        elif [ "${{ github.event.inputs.sdk }}" == "rust" ]; then
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+        elif [ "${{ github.event.inputs.sdk }}" == "python" ]; then
+          sudo apt-get install -y python3
+        elif [ "${{ github.event.inputs.sdk }}" == "java" ]; then
+          sudo apt install -y default-jdk
+        elif [ "${{ github.event.inputs.sdk }}" == "ruby" ]; then
+          sudo apt install -y ruby-full
+        elif [ "${{ github.event.inputs.sdk }}" == "dotnet" ]; then
           sudo apt-get install -y dotnet-sdk-5.0
-        }
+        fi
+
+
 
     - name: Setup Infrastructure
       run: |
