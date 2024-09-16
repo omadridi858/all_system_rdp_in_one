@@ -92,12 +92,10 @@ jobs:
           sudo useradd -m -s /bin/bash runneradmin
           echo "runneradmin:P@ssw0rd!" | sudo chpasswd
         } elseif ($env:RUNNER_OS -eq "macOS") {
-          brew install --cask real-vnc
-          sudo launchctl load /Library/LaunchDaemons/com.realvnc.vncserver.plist
-          sudo defaults write /Library/Preferences/com.realvnc.vncserver.plist -dict-add "Authentication" -string "VNCPassword"
-          sudo defaults write /Library/Preferences/com.realvnc.vncserver.plist -dict-add "Password" -string "P@ssw0rd!"
-          sudo defaults write /Library/Preferences/com.realvnc.vncserver.plist -dict-add "Access" -string "1"
-          sudo defaults write /Library/Preferences/com.realvnc.vncserver.plist -dict-add "Security" -string "1"
+          # macOS built-in Screen Sharing setup
+          sudo systemsetup -setremotelogin on
+          sudo /usr/sbin/systemsetup -setremoteappleevents on
+          sudo defaults write /Library/Preferences/com.apple.ScreenSharing.plist 'password' -string 'P@ssw0rd!'
         }
     - name: Print Connection Details
       if: runner.os == 'Linux'
@@ -119,3 +117,4 @@ jobs:
         } elseif ($env:RUNNER_OS -eq "macOS") {
           ./ngrok/ngrok tcp 5900
         }
+
