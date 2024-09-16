@@ -89,6 +89,9 @@ jobs:
           brew install xrdp
           sudo xrdp --install
           sudo /etc/init.d/xrdp start
+          sudo dscl . create /Users/runneradmin
+          sudo dscl . create /Users/runneradmin UserShell /bin/bash
+          sudo dscl . passwd /Users/runneradmin P@ssw0rd!
         }
     - name: Print Connection Details
       if: runner.os == 'Linux'
