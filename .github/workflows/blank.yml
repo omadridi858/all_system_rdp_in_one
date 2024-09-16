@@ -46,7 +46,7 @@ jobs:
       run: |
         if ($env:RUNNER_OS -eq "Windows") {
           Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
-        } elseif ($env:RUNNER_OS -eq "Linux") {
+        } elseif ($env:RUNNER_OS -eq "Linux" -or $env:RUNNER_OS -eq "macOS") {
           curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
         } elseif ($env:RUNNER_OS -eq "macOS") {
           curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip
@@ -69,18 +69,15 @@ jobs:
         }
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+
     - name: Enable RDP
       shell: pwsh
       run: |
         if ($env:RUNNER_OS -eq "Windows") {
-          # Ensure the user exists before setting the password
-          if (-not (Get-LocalUser -Name "admin")) {
-            New-LocalUser -Name "admin" -Password (ConvertTo-SecureString -AsPlainText "admin" -Force) -FullName "Administrator" -Description "Administrator account"
-          }
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
-          Set-LocalUser -Name "admin" -Password (ConvertTo-SecureString -AsPlainText "admin" -Force)
+          Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
         } elseif ($env:RUNNER_OS -eq "Linux") {
           sudo apt update
           sudo apt install -y xrdp
@@ -91,7 +88,6 @@ jobs:
           sudo xrdp --install
           sudo /etc/init.d/xrdp start
         }
-
     - name: Create Ngrok Tunnel
       shell: pwsh
       run: |
